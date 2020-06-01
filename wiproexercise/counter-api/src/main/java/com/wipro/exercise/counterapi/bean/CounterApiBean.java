@@ -5,6 +5,12 @@ import java.util.Map;
 
 import io.swagger.annotations.ApiModel;
 
+/**
+ * @author Suchithra
+ * Bean was initially designed to hold the request/response data but was later not needed.
+ * Can be removed
+ *
+ */
 @ApiModel("Counter API details")
 public class CounterApiBean {
 	private List<String> searchText;

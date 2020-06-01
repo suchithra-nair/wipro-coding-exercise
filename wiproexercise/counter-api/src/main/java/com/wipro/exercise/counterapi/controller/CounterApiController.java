@@ -3,15 +3,12 @@ package com.wipro.exercise.counterapi.controller;
 import static java.util.Map.Entry.comparingByValue;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -43,12 +40,11 @@ public class CounterApiController {
 	
 	private static Logger LOGGER = LoggerFactory.getLogger(CounterApiController.class);
 	
-	@Value(value = "counter.response.csv.file.name")
+	@Value("${counter.response.csv.file.name}")
 	private String csvFileName;
 	
-	//TODO: To be replaced by call to other rest service
-	//@Value(value = "counter.response.text.file.name")
-	private String textFileName = "sampleText.txt";
+	@Value("${counter.search.data.service.endpoint}")
+	private String searchDataEndPoint;
 	
 	@Autowired
 	private ResponseProcessUtil reponseProcessUtil;
@@ -64,35 +60,25 @@ public class CounterApiController {
 	public ResponseEntity<Map<String,Integer>> search(@RequestBody CounterApiBean requestBean) throws IOException {
 		Map<String, Integer> responseMap = null;
 		try {
-			/*
-			 * Path path = Paths.get(textFileName);
-			 * 
-			 * //Groups the words in the paragraph by number of occurrences Map<String,
-			 * Long> wordCount = Files.lines(path) .flatMap(line ->
-			 * Arrays.stream(line.trim().split(" "))) .map(word ->
-			 * word.replaceAll("[^a-zA-Z]", "").toLowerCase().trim())
-			 * .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
-			 */
+			//Loads the search data from counter-api-search-data service
 			Map<String, Integer> wordCountMap = loadSearchData();
-			responseMap = new HashMap<String, Integer>();
-			for (String word : requestBean.getSearchText()) {
-				if (wordCountMap.containsKey(word.toLowerCase())) {
-					responseMap.put(word, wordCountMap.get(word.toLowerCase()));
-				} else {
-					responseMap.put(word, 0);
-				}
+			
+			//Formating the response
+			if(null != wordCountMap) {
+				responseMap = formatResponse(requestBean, wordCountMap);
 			}
+			
 		} catch (Exception e) {
 			LOGGER.error("Execption in processing /counter-api/search request : " +e);
 			throw new RequestProcessException("Execption in processing /counter-api/search request : " +e.getMessage());
 		}
 
-		return ResponseEntity.ok().header("Content-Disposition", "attachment; filename=" + csvFileName)
+		return ResponseEntity.ok().header("Content-Disposition")
 				.contentType(MediaType.parseMediaType("application/json"))
 				.body(responseMap);
 		
 	}
-	
+
 	/**
 	 * @param limit
 	 * @return
@@ -103,12 +89,19 @@ public class CounterApiController {
 		Path file = null;
 		try {
 			
+			//Loads the search data from counter-api-search-data service
 			Map<String, Integer> wordCountMap = loadSearchData();
+			
 			if (null != wordCountMap) {
 				// Sort the data by the number of occurrences and pick the top {limit} values
-				Map<String, Integer> resultMap = wordCountMap.entrySet().stream()
-						.sorted(Collections.reverseOrder(comparingByValue())).limit(limit).collect(Collectors
-								.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e2, LinkedHashMap::new));
+				Map<String, Integer> resultMap = wordCountMap.entrySet()
+											.stream()
+											.sorted(Collections.reverseOrder(comparingByValue()))
+											.limit(limit)
+											.collect(Collectors.toMap(Map.Entry::getKey, 
+													Map.Entry::getValue, 
+													(e1, e2) -> e2, 
+													LinkedHashMap::new));
 
 				// Convert the data into CSV file
 				reponseProcessUtil.exportDataToCsv(resultMap);
@@ -125,9 +118,30 @@ public class CounterApiController {
 		 
 	}
 	
+	/**
+	 * @param requestBean
+	 * @param wordCountMap
+	 * @return
+	 */
+	private Map<String, Integer> formatResponse(CounterApiBean requestBean, Map<String, Integer> wordCountMap) {
+		Map<String, Integer> responseMap;
+		responseMap = new HashMap<String, Integer>();
+		for (String word : requestBean.getSearchText()) {
+			if (wordCountMap.containsKey(word.toLowerCase())) {
+				responseMap.put(word, wordCountMap.get(word.toLowerCase()));
+			} else {
+				responseMap.put(word, 0);
+			}
+		}
+		return responseMap;
+	}
+	
+	/** Method calls a rest service to load the search data from file
+	 * @return
+	 */
 	private Map<String, Integer> loadSearchData() {
 		ResponseEntity<Object> responseEntity = new RestTemplate()
-				.getForEntity("http://localhost:8081/search-data/load",  Object.class); //response type
+				.getForEntity(searchDataEndPoint,  Object.class);
 		return (Map<String, Integer>) responseEntity.getBody();
 	}
 }

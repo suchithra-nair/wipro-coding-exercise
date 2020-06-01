@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 public class ResponseProcessUtil {
 	private static Logger LOGGER = LoggerFactory.getLogger(ResponseProcessUtil.class);
 
-	@Value(value = "counter.response.csv.file.name")
+	@Value("${counter.response.csv.file.name}")
 	private String csvFileName;
 
 	public void exportDataToCsv(Map<String, Integer> resultMap) {
