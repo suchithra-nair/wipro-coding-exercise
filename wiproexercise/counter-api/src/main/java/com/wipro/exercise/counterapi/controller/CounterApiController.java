@@ -144,4 +144,5 @@ public class CounterApiController {
 				.getForEntity(searchDataEndPoint,  Object.class);
 		return (Map<String, Integer>) responseEntity.getBody();
 	}
+
 }
